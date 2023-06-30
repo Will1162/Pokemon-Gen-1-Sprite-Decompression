@@ -13,14 +13,132 @@ int main()
 		0x39, 0x08, 0xC5, 0x81, 0x8D, 0x12, 0x2D, 0x8B, 0x60, 0x63, 0x59, 0x93, 0x06, 0xF6, 0x8E, 0x19,
 		0xAA, 0xA8, 0x23, 0xA2, 0x4F, 0x06, 0x4F, 0x06, 0x54, 0xE2
 	};
-
 	int totalBits = sizeof(spriteData) * 8;
 
+	unsigned char *spriteDataBits = new unsigned char[totalBits];
 	for (int i = 0; i < totalBits; i++)
 	{
-		std::cout << (int)((spriteData[i / 8] >> (7 - (i % 8))) & 1);
+		spriteDataBits[i] = (spriteData[i / 8] >> (7 - (i % 8))) & 1;
 	}
 
+	/*
+		metadata
+		-      4 bits: sprite width
+		-      4 bits: sprite height
+		-      1 bit : primary buffer flag
+		-      1 bit : initial packet type
+		-      x bits: compressed sprite data
+		- 1 or 2 bits: encoding mode
+		-      1 bit : initial packet type
+		-      x bits: compressed sprite data
+	*/
+
+	int spriteWidth   = (spriteData[0] & 0b11110000) >> 4;
+	int spriteHeight  = (spriteData[0] & 0b00001111) >> 0;
+	int primaryBuffer = (spriteData[1] & 0b10000000) >> 8;
+	int initialPacket = (spriteData[1] & 0b01000000) >> 7;
+	const char *initialPacketName = (initialPacket) ? "Data" : "RLE";
+
+	int currentBit = 10;
+
+	std::cout << "Metadata: " << std::endl;
+	std::cout << "Sprite Width: " << spriteWidth << std::endl;
+	std::cout << "Sprite Height: " << spriteHeight << std::endl;
+	std::cout << "Primary Buffer: " << primaryBuffer << std::endl;
+	std::cout << "Initial Packet: " << initialPacketName << std::endl;
+	std::cout << "Total Bits: " << totalBits << std::endl;
+	std::cout << "Total Pixels: " << spriteWidth * spriteHeight * 64 << std::endl << std::endl;
+	std::cout << "Sprite Data: " << std::endl;
+
+	unsigned char *bitPlane0 = new unsigned char[spriteWidth * spriteHeight * 64];
+	unsigned char *bitPlane1 = new unsigned char[spriteWidth * spriteHeight * 64];
+	int bitPlane0Index = 0;
+	int bitPlane1Index = 0;
+
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		bitPlane0[i] = 2;
+	}
+
+	if (initialPacket == 0)
+	{
+		// RLE
+		int bitsToRead = 1;
+
+		int val1 = 0;
+		while (spriteDataBits[currentBit] != 0)
+		{
+			val1 = val1 << 1;
+			val1 |= spriteDataBits[currentBit];
+			currentBit++;
+			bitsToRead++;
+		}
+		currentBit++;
+		val1 = val1 << 1;
+		
+		int val2 = 0;
+		while (bitsToRead > 0)
+		{
+			val2 = val2 << 1;
+			val2 |= spriteDataBits[currentBit];
+			currentBit++;
+			bitsToRead--;
+		}
+
+		int zeroPairCount = val1 + val2 + 1;
+		std::cout << "Zero pair count: " << zeroPairCount << std::endl;
+
+		for (int i = 0; i < zeroPairCount * 2; i++)
+		{
+			bitPlane0[i + bitPlane0Index] = 0;
+		}
+		bitPlane0Index += zeroPairCount * 2;
+	}
+
+	// direct data packet
+	// search through pairs of bits until 00 is found (end of packet)
+	int currentBitPair = -1;
+	while (currentBitPair != 0)
+	{
+		currentBitPair = spriteDataBits[currentBit] << 1;
+		currentBitPair |= spriteDataBits[currentBit + 1];
+		currentBit += 2;
+		if (currentBitPair == 0)
+			break;
+
+		// write bit pair to bit plane
+		bitPlane0[bitPlane0Index] = (currentBitPair & 0b10) >> 1;
+		bitPlane0Index++;
+		bitPlane0[bitPlane0Index] = (currentBitPair & 0b01) >> 0;
+		bitPlane0Index++;
+	}
+
+
+
+
+	// output bit plane
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		if (bitPlane0[i] == 2)
+			std::cout << "_ ";
+		else
+			std::cout << (int)bitPlane0[i] << " ";
+		if (((i + 1) % (8 * spriteWidth)) == 0)
+			std::cout << std::endl;
+	}
+	std::cout << std::endl;
+	
+
+	// std::cout << "Raw Data: " << std::endl;
+	// for (int i = 0; i < totalBits; i++)
+	// {
+	// 	std::cout << (int)spriteDataBits[i];
+	// 	if (((i + 1) % 8) == 0)
+	// 		std::cout << " ";
+	// 	if (((i + 1) % (8 * spriteWidth)) == 0)
+	// 		std::cout << std::endl;
+	// }
+	// std::cout << std::endl;
 
 
 	return 0;
