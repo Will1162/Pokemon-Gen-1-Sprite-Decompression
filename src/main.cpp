@@ -37,10 +37,12 @@ int main()
 	int spriteHeight  = (spriteData[0] & 0b00001111) >> 0;
 	int primaryBuffer = (spriteData[1] & 0b10000000) >> 8;
 	int packetType = (spriteData[1] & 0b01000000) >> 7;
+	int encodingMode = -1;
 	const char *packetName = (packetType) ? "Data" : "RLE";
 
 	int currentBit = 10;
 
+	// output metadata
 	std::cout << "Metadata: " << std::endl;
 	std::cout << "Sprite Width: " << spriteWidth << std::endl;
 	std::cout << "Sprite Height: " << spriteHeight << std::endl;
@@ -48,20 +50,22 @@ int main()
 	std::cout << "Initial Packet: " << packetName << std::endl;
 	std::cout << "Total Bits: " << totalBits << std::endl;
 	std::cout << "Total Pixels: " << spriteWidth * spriteHeight * 64 << std::endl << std::endl;
-	std::cout << "Bit Plane 0 Data: " << std::endl;
 
+	// define bit planes
 	unsigned char *bitPlane0 = new unsigned char[spriteWidth * spriteHeight * 64];
 	unsigned char *bitPlane1 = new unsigned char[spriteWidth * spriteHeight * 64];
+	unsigned char *bitPlaneTemp = new unsigned char[spriteWidth * spriteHeight * 64];
 	int bitPlane0Index = 0;
 	int bitPlane1Index = 0;
 
+	// fill bit planes with placeholder data
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
 	{
 		bitPlane0[i] = 2;
 		bitPlane1[i] = 2;
 	}
 
-	// first bit plane
+	// start to decode first bit plane
 	while (bitPlane0Index < spriteWidth * spriteHeight * 64)
 	{
 		if (packetType == 0)
@@ -120,7 +124,20 @@ int main()
 		packetType = !packetType;
 	}
 
-	// second bit plane
+	// metadata for encoding mode
+	encodingMode = spriteDataBits[currentBit];
+	if (encodingMode == 1)
+	{
+		encodingMode = packetType << 1;
+		encodingMode |= spriteDataBits[currentBit + 1];
+		currentBit += 2;
+	}
+	else
+	{
+		currentBit++;
+	}
+
+	// start to decode second bit plane
 	packetType = spriteDataBits[currentBit];
 	currentBit++;
 
@@ -184,42 +201,92 @@ int main()
 
 
 
-
-	// output bit plane
+	// transform row based bit planes to column pair based bit planes
+	// bitPlane0
+	int x = 0;
+	int y = 0;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i+=2)
+	{
+		bitPlaneTemp[x + y * spriteWidth * 8] = bitPlane0[i];
+		bitPlaneTemp[x + y * spriteWidth * 8 + 1] = bitPlane0[i + 1];
+		y++;
+		if (y == spriteHeight * 8)
+		{
+			y = 0;
+			x += 2;
+		}
+	}
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
 	{
-		if (bitPlane0[i] == 2)
-			std::cout << "_ ";
-		else
-			std::cout << (int)bitPlane0[i] << " ";
+		bitPlane0[i] = bitPlaneTemp[i];
+	}
+
+	// bitPlane1
+	x = 0;
+	y = 0;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i+=2)
+	{
+		bitPlaneTemp[x + y * spriteWidth * 8] = bitPlane1[i];
+		bitPlaneTemp[x + y * spriteWidth * 8 + 1] = bitPlane1[i + 1];
+		y++;
+		if (y == spriteHeight * 8)
+		{
+			y = 0;
+			x += 2;
+		}
+	}
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		bitPlane1[i] = bitPlaneTemp[i];
+	}
+
+
+	// delta decode bitPlane0
+	int val = 0;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		if (bitPlane0[i] == 1)
+		{
+			val = !val;
+		}
+		bitPlane0[i] = val;
+	}
+	// output bitPlane0
+	std::cout << "Bit Plane 0 Delta decoded: " << std::endl;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		if (bitPlane0[i] == 0)
+			std::cout << "  ";
+		if (bitPlane0[i] == 1)
+			std::cout << "# ";
 		if (((i + 1) % (8 * spriteWidth)) == 0)
 			std::cout << std::endl;
 	}
 	std::cout << std::endl;
 
-	std::cout << "Bit Plane 1 Data: " << std::endl;
+	
+	// delta decode bitPlane1
+	val = 0;
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
 	{
-		if (bitPlane1[i] == 2)
-			std::cout << "_ ";
-		else
-			std::cout << (int)bitPlane1[i] << " ";
+		if (bitPlane1[i] == 1)
+		{
+			val = !val;
+		}
+		bitPlane1[i] = val;
+	}
+	// output bitPlane1
+	std::cout << "Bit Plane 1 Delta decoded: " << std::endl;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		if (bitPlane1[i] == 0)
+			std::cout << "  ";
+		if (bitPlane1[i] == 1)
+			std::cout << "# ";
 		if (((i + 1) % (8 * spriteWidth)) == 0)
 			std::cout << std::endl;
 	}
-	
-
-	// std::cout << "Raw Data: " << std::endl;
-	// for (int i = 0; i < totalBits; i++)
-	// {
-	// 	std::cout << (int)spriteDataBits[i];
-	// 	if (((i + 1) % 8) == 0)
-	// 		std::cout << " ";
-	// 	if (((i + 1) % (8 * spriteWidth)) == 0)
-	// 		std::cout << std::endl;
-	// }
-	// std::cout << std::endl;
-
+	std::cout << std::endl;
 
 	return 0;
 }
