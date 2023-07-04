@@ -58,8 +58,10 @@ int main()
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
 	{
 		bitPlane0[i] = 2;
+		bitPlane1[i] = 2;
 	}
 
+	// first bit plane
 	while (bitPlane0Index < spriteWidth * spriteHeight * 64)
 	{
 		if (packetType == 0)
@@ -118,6 +120,68 @@ int main()
 		packetType = !packetType;
 	}
 
+	// second bit plane
+	packetType = spriteDataBits[currentBit];
+	currentBit++;
+
+	while (bitPlane1Index < spriteWidth * spriteHeight * 64)
+	{
+		if (packetType == 0)
+		{
+			// RLE packet
+			int bitsToRead = 1;
+
+			int val1 = 0;
+			while (spriteDataBits[currentBit] != 0)
+			{
+				val1 = val1 << 1;
+				val1 |= spriteDataBits[currentBit];
+				currentBit++;
+				bitsToRead++;
+			}
+			currentBit++;
+			val1 = val1 << 1;
+			
+			int val2 = 0;
+			while (bitsToRead > 0)
+			{
+				val2 = val2 << 1;
+				val2 |= spriteDataBits[currentBit];
+				currentBit++;
+				bitsToRead--;
+			}
+
+			int zeroPairCount = val1 + val2 + 1;
+
+			for (int i = 0; i < zeroPairCount * 2; i++)
+			{
+				bitPlane1[i + bitPlane1Index] = 0;
+			}
+			bitPlane1Index += zeroPairCount * 2;
+		}
+		else
+		{
+			// Direct data packet
+			// search through pairs of bits until 00 is found (end of packet)
+			int currentBitPair = -1;
+			while (currentBitPair != 0)
+			{
+				currentBitPair = spriteDataBits[currentBit] << 1;
+				currentBitPair |= spriteDataBits[currentBit + 1];
+				currentBit += 2;
+				if (currentBitPair == 0)
+					break;
+
+				// write bit pair to bit plane
+				bitPlane1[bitPlane1Index] = (currentBitPair & 0b10) >> 1;
+				bitPlane1Index++;
+				bitPlane1[bitPlane1Index] = (currentBitPair & 0b01) >> 0;
+				bitPlane1Index++;
+			}
+		}
+		packetType = !packetType;
+	}
+
 
 
 
@@ -132,6 +196,17 @@ int main()
 			std::cout << std::endl;
 	}
 	std::cout << std::endl;
+
+	std::cout << "Bit Plane 1 Data: " << std::endl;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		if (bitPlane1[i] == 2)
+			std::cout << "_ ";
+		else
+			std::cout << (int)bitPlane1[i] << " ";
+		if (((i + 1) % (8 * spriteWidth)) == 0)
+			std::cout << std::endl;
+	}
 	
 
 	// std::cout << "Raw Data: " << std::endl;
