@@ -2,18 +2,26 @@
 
 int main()
 {
-	unsigned char spriteData[] = {
-		0x44, 0x37, 0x7A, 0x93, 0xAD, 0x48, 0x64, 0xEE, 0xB6, 0x4E, 0x99, 0xD0, 0xB6, 0x39, 0x92, 0x2F,
-		0x48, 0xFF, 0x8C, 0x95, 0x56, 0x08, 0x9B, 0x23, 0xF4, 0xC1, 0xA2, 0xF6, 0x25, 0x88, 0x57, 0xCA,
-		0x48, 0x6A, 0x90, 0x81, 0x58, 0xAF, 0xE3, 0x08, 0x21, 0x51, 0x8C, 0x54, 0x2A, 0xD3, 0x38, 0x63,
-		0x17, 0x98, 0xD1, 0x50, 0x96, 0x62, 0xB9, 0x8D, 0x66, 0xFA, 0xA2, 0x55, 0xA3, 0x86, 0x6E, 0xA8,
-		0x63, 0xA2, 0x64, 0xEF, 0x99, 0x8E, 0xE9, 0xD3, 0x88, 0xDD, 0xFE, 0x4E, 0xB5, 0x18, 0x24, 0xEE,
-		0x90, 0x93, 0xA6, 0xA4, 0x24, 0x23, 0x99, 0x2A, 0x48, 0xAA, 0x8C, 0x95, 0x56, 0x34, 0x54, 0xC5,
-		0xB6, 0xAA, 0x4B, 0x62, 0x15, 0xF2, 0x90, 0x8C, 0x69, 0x58, 0xE1, 0x89, 0x53, 0x44, 0x6A, 0x53,
-		0x39, 0x08, 0xC5, 0x81, 0x8D, 0x12, 0x2D, 0x8B, 0x60, 0x63, 0x59, 0x93, 0x06, 0xF6, 0x8E, 0x19,
-		0xAA, 0xA8, 0x23, 0xA2, 0x4F, 0x06, 0x4F, 0x06, 0x54, 0xE2
-	};
-	int totalBits = sizeof(spriteData) * 8;
+	// import sprite.bin
+	FILE *spriteFile = fopen("sprite.bin", "rb");
+	if (spriteFile == NULL)
+	{
+		std::cout << "Error: Could not open sprite.bin" << std::endl;
+		return 1;
+	}
+
+	// get size of sprite.bin
+	fseek(spriteFile, 0, SEEK_END);
+	int spriteFileSize = ftell(spriteFile);
+	rewind(spriteFile);
+
+	// copy sprite.bin to spriteData
+	unsigned char *spriteData = new unsigned char[spriteFileSize];
+	fread(spriteData, 1, spriteFileSize, spriteFile);
+	fclose(spriteFile);
+	
+
+	int totalBits = spriteFileSize * 8;
 
 	unsigned char *spriteDataBits = new unsigned char[totalBits];
 	for (int i = 0; i < totalBits; i++)
@@ -49,7 +57,7 @@ int main()
 	std::cout << "Primary Buffer: " << primaryBuffer << std::endl;
 	std::cout << "Initial Packet: " << packetName << std::endl;
 	std::cout << "Total Bits: " << totalBits << std::endl;
-	std::cout << "Total Pixels: " << spriteWidth * spriteHeight * 64 << std::endl << std::endl;
+	std::cout << "Total Pixels: " << spriteWidth * spriteHeight * 64 << std::endl;
 
 	// define bit planes
 	unsigned char *bitPlane0 = new unsigned char[spriteWidth * spriteHeight * 64];
@@ -136,6 +144,7 @@ int main()
 	{
 		currentBit++;
 	}
+	std::cout << "Encoding Mode: " << encodingMode << std::endl << std::endl;
 
 	// start to decode second bit plane
 	packetType = spriteDataBits[currentBit];
@@ -250,20 +259,10 @@ int main()
 			val = !val;
 		}
 		bitPlane0[i] = val;
-	}
-	// output bitPlane0
-	std::cout << "Bit Plane 0 Delta decoded: " << std::endl;
-	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
-	{
-		if (bitPlane0[i] == 0)
-			std::cout << "  ";
-		if (bitPlane0[i] == 1)
-			std::cout << "# ";
+		// reset val to 0 every new row
 		if (((i + 1) % (8 * spriteWidth)) == 0)
-			std::cout << std::endl;
+			val = 0;
 	}
-	std::cout << std::endl;
-
 	
 	// delta decode bitPlane1
 	val = 0;
@@ -274,19 +273,43 @@ int main()
 			val = !val;
 		}
 		bitPlane1[i] = val;
+		// reset val to 0 every new row
+		if (((i + 1) % (8 * spriteWidth)) == 0)
+			val = 0;
 	}
-	// output bitPlane1
-	std::cout << "Bit Plane 1 Delta decoded: " << std::endl;
+
+	// combine bit planes
+	unsigned char *spriteDataDecoded = new unsigned char[spriteWidth * spriteHeight * 64];
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
 	{
-		if (bitPlane1[i] == 0)
-			std::cout << "  ";
-		if (bitPlane1[i] == 1)
-			std::cout << "# ";
-		if (((i + 1) % (8 * spriteWidth)) == 0)
-			std::cout << std::endl;
+		spriteDataDecoded[i] = bitPlane0[i] | (bitPlane1[i] << 1);
 	}
-	std::cout << std::endl;
+
+	// output sprite data
+	std::cout << "Sprite Data Decoded: " << std::endl;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+	{
+		switch (spriteDataDecoded[i])
+		{
+		case 0b00:
+			std::cout << "$$";
+			break;
+		case 0b01:
+			std::cout << ";;";
+			break;
+		case 0b10:
+			std::cout << "..";
+			break;
+		case 0b11:
+			std::cout << "  ";
+			break;
+		}
+
+		if (((i + 1) % (8 * spriteWidth)) == 0)
+			std::cout << std::endl;	
+	}
+
+
 
 	return 0;
 }
