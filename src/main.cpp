@@ -102,8 +102,33 @@ int main()
 		bitPlaneTemp[i] = bitPlane0[i] << primaryBuffer | (bitPlane1[i] << !primaryBuffer);
 	}
 
+	// output compressed sprite data
+	std::cout << "Sprite Data Compressed: " << std::endl;
+	for (int i = 0; i < spriteWidth * spriteHeight * 64; i+=2)
+	{
+		switch (spriteDataBits[i] << 1 | spriteDataBits[i + 1])
+		{
+			case 0b00:
+				std::cout << "$$";
+				break;
+			case 0b01:
+				std::cout << ";;";
+				break;
+			case 0b10:
+				std::cout << "..";
+				break;
+			case 0b11:
+				std::cout << "  ";
+				break;
+		}
+
+		if (((i + 2) % (16 * spriteWidth)) == 0)
+			std::cout << std::endl;	
+	}
+	std::cout << std::endl;
+
 	// output sprite data using 2 characters to make the sprite more visible/square
-	std::cout << "Sprite Data Decoded: " << std::endl;
+	std::cout << "Sprite Data Decompressed: " << std::endl;
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
 	{
 		switch (bitPlaneTemp[i])
@@ -125,6 +150,13 @@ int main()
 		if (((i + 1) % (8 * spriteWidth)) == 0)
 			std::cout << std::endl;	
 	}
+
+	// cleanup
+	delete[] spriteDataBytes;
+	delete[] spriteDataBits;
+	delete[] bitPlane0;
+	delete[] bitPlane1;
+	delete[] bitPlaneTemp;
 
 	return 0;
 }
