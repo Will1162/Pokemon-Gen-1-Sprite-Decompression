@@ -20,7 +20,6 @@ int main()
 	fread(spriteData, 1, spriteFileSize, spriteFile);
 	fclose(spriteFile);
 	
-
 	int totalBits = spriteFileSize * 8;
 
 	unsigned char *spriteDataBits = new unsigned char[totalBits];
@@ -43,7 +42,7 @@ int main()
 
 	int spriteWidth   = (spriteData[0] & 0b11110000) >> 4;
 	int spriteHeight  = (spriteData[0] & 0b00001111) >> 0;
-	int primaryBuffer = (spriteData[1] & 0b10000000) >> 8;
+	int primaryBuffer = (spriteData[1] & 0b10000000) >> 7;
 	int packetType = (spriteData[1] & 0b01000000) >> 7;
 	int encodingMode = -1;
 	const char *packetName = (packetType) ? "Data" : "RLE";
@@ -56,8 +55,9 @@ int main()
 	std::cout << "Sprite Height: " << spriteHeight << std::endl;
 	std::cout << "Primary Buffer: " << primaryBuffer << std::endl;
 	std::cout << "Initial Packet: " << packetName << std::endl;
-	std::cout << "Total Bits: " << totalBits << std::endl;
-	std::cout << "Total Pixels: " << spriteWidth * spriteHeight * 64 << std::endl;
+	std::cout << "Input Bits: " << totalBits << std::endl;
+	std::cout << "Output Bits: " << spriteWidth * spriteHeight * 64 * 2 << std::endl;
+	std::cout << "Compression Ratio: " << (float)(spriteWidth * spriteHeight * 64 * 2) / (float)totalBits << std::endl;
 
 	// define bit planes
 	unsigned char *bitPlane0 = new unsigned char[spriteWidth * spriteHeight * 64];
@@ -142,6 +142,7 @@ int main()
 	}
 	else
 	{
+		encodingMode = 1;
 		currentBit++;
 	}
 	std::cout << "Encoding Mode: " << encodingMode << std::endl << std::endl;
