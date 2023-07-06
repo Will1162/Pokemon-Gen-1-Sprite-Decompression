@@ -279,6 +279,17 @@ int main()
 			val = 0;
 	}
 
+	// depending on primary buffer flag, swap bit planes
+	if (primaryBuffer == 1)
+	{
+		for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
+		{
+			bitPlaneTemp[i] = bitPlane0[i];
+			bitPlane0[i] = bitPlane1[i];
+			bitPlane1[i] = bitPlaneTemp[i];
+		}
+	}
+
 	// combine bit planes
 	unsigned char *spriteDataDecoded = new unsigned char[spriteWidth * spriteHeight * 64];
 	for (int i = 0; i < spriteWidth * spriteHeight * 64; i++)
