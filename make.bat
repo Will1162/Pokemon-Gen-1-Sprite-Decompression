@@ -9,6 +9,7 @@ echo Building...
 
 g++ -std=c++17 -O2 ^
 src/main.cpp ^
+src/utility.cpp ^
 -o pokemon_sprite.exe
 
 echo Done
